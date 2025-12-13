@@ -72,4 +72,13 @@ hs_err_pid*
 # Application specific
 application-local.yml
 application-local.properties
+HELP.md
+
+# Database
+db-data/
+
+# Generated protobuf files (keep source .proto files)
+**/target/generated-sources/protobuf/
+**/target/protoc-dependencies/
+**/target/protoc-plugins/
 

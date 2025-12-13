@@ -1,10 +1,12 @@
 package com.neeraj.patientservice.service;
 
+import billing.BillingResponse;
 import com.neeraj.patientservice.dto.PatientRequestDTO;
 import com.neeraj.patientservice.dto.PatientResponseDTO;
 import com.neeraj.patientservice.entity.Patient;
 import com.neeraj.patientservice.exception.EmailAlreadyExistsException;
 import com.neeraj.patientservice.exception.PatientNotFoundException;
+import com.neeraj.patientservice.grpc.BillingServiceGrpcClient;
 import com.neeraj.patientservice.mapper.PatientMapper;
 import com.neeraj.patientservice.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PatientService {
     private final PatientRepository patientRepository;
+    private final BillingServiceGrpcClient billingServiceGrpcClient;
 
     public List<PatientResponseDTO> getAllPatients() {
         log.info("Fetching all patients from the database");
@@ -45,6 +48,15 @@ public class PatientService {
         }
 
         Patient createdPatient = patientRepository.save(PatientMapper.toEntity(dto));
+
+        // Create Billing Account for new patient
+        BillingResponse billingResponse = billingServiceGrpcClient.createBillingAccount(
+                createdPatient.getId().toString(),
+                createdPatient.getName(),
+                createdPatient.getEmail()
+        );
+        log.info("Received BillingResponse for new patient: {}", billingResponse);
+
         return PatientMapper.toDTO(createdPatient);
     }
 
