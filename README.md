@@ -7,11 +7,17 @@ A Spring Boot microservices architecture demonstrating gRPC inter-service commun
 ## Architecture
 
 ```
-Patient Service (REST) ──[gRPC]──> Billing Service
-       ↓                    ↓
-PostgreSQL Database    Kafka (Event Streaming)
-                            ↓
-                      Analytics Service (Consumer)
+                    API Gateway (4004)
+                          ↓
+              ┌───────────┴───────────┐
+              ↓                       ↓
+     Patient Service          Analytics Service
+          (4000)                   (4002)
+              ↓                       ↑
+        ├─────┴─────┐                │
+        ↓           ↓                │
+   PostgreSQL   Billing Service ────┘
+                   (4001)      Kafka Events
 ```
 
 ## Services
@@ -64,6 +70,26 @@ Kafka consumer microservice for processing patient events and analytics.
 - Consumer group: `analytics-service`
 - Real-time event processing and logging
 
+### 4. API Gateway
+Spring Cloud Gateway for routing and centralizing API access.
+
+**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Spring Cloud Gateway (WebFlux)
+
+**Port:** `4004`
+
+**Features:**
+- Centralized entry point for all microservices
+- Route configuration for Patient Service
+- Path-based routing (`/api/v1/patients/**`)
+- API documentation aggregation
+- Reactive gateway using Spring WebFlux
+
+**Routes:**
+| Path | Target Service | Port |
+|------|---------------|------|
+| `/api/v1/patients/**` | Patient Service | 4000 |
+| `/api-docs/patients` | Patient API Docs | 4000 |
+
 ## Quick Start
 
 ### Prerequisites
@@ -83,7 +109,7 @@ docker-compose ps
 
 ### 2. Start Services
 ```bash
-# Terminal 1 - Billing Service
+# Terminal 1 - Billing Service (Start First!)
 cd billing-service
 ./mvnw spring-boot:run
 
@@ -94,18 +120,42 @@ cd patient-service
 # Terminal 3 - Analytics Service (Kafka Consumer)
 cd analytics-service
 ./mvnw spring-boot:run
+
+# Terminal 4 - API Gateway
+cd api-gateway
+./mvnw spring-boot:run
 ```
 
-### 3. Access API Documentation
+### 3. Access API
+**Via API Gateway (Recommended):**
+- API Gateway: http://localhost:4004/api/v1/patients
+- Patient Service: http://localhost:4004/api/v1/patients
+- API Docs: http://localhost:4004/api-docs/patients
+
+**Direct Service Access:**
+- Patient Service: http://localhost:4000/api/v1/patients
 - Swagger UI: http://localhost:4000/swagger-ui.html
 - OpenAPI Spec: http://localhost:4000/v3/api-docs
 
-### 4. Test Kafka Integration
-Create a patient via POST request - the service will:
-1. Save patient to PostgreSQL
-2. Call Billing Service via gRPC
-3. Publish `PatientEvent` to Kafka topic `patient`
-4. Analytics Service consumes and logs the event
+### 4. Test the Complete Flow
+Create a patient via API Gateway:
+```bash
+curl -X POST http://localhost:4004/api/v1/patients \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "address": "123 Main St",
+    "dateOfBirth": "1990-01-01"
+  }'
+```
+
+**Event Flow:**
+1. API Gateway routes request to Patient Service
+2. Patient saved to PostgreSQL
+3. Patient Service calls Billing Service via gRPC
+4. Patient Service publishes `PatientEvent` to Kafka
+5. Analytics Service consumes and logs the event
 
 ## Infrastructure
 
@@ -141,6 +191,7 @@ The database automatically populates with 15 sample patients on application star
 cd patient-service && ./mvnw clean install
 cd ../billing-service && ./mvnw clean install
 cd ../analytics-service && ./mvnw clean install
+cd ../api-gateway && ./mvnw clean install
 ```
 
 ## What's Implemented
@@ -150,6 +201,7 @@ cd ../analytics-service && ./mvnw clean install
 ✅ gRPC client-server communication (Patient → Billing)  
 ✅ Kafka event streaming (async patient events)  
 ✅ Kafka Consumer service (Analytics Service)  
+✅ API Gateway with Spring Cloud Gateway (centralized routing)  
 ✅ Protocol Buffers for gRPC and Kafka serialization  
 ✅ Bean validation with custom groups  
 ✅ Auto-populated sample data (15 patients)  
@@ -160,9 +212,10 @@ cd ../analytics-service && ./mvnw clean install
 ## Planned Features
 
 🚧 Service Discovery (Eureka)  
-🚧 API Gateway  
+🚧 Load Balancing in API Gateway  
 🚧 Appointment Service  
-🚧 Authentication & Authorization  
-🚧 Distributed Tracing  
-🚧 Centralized Configuration
+🚧 Authentication & Authorization (JWT)  
+🚧 Distributed Tracing (Zipkin)  
+🚧 Centralized Configuration (Spring Cloud Config)  
+🚧 Circuit Breaker (Resilience4j)
 
