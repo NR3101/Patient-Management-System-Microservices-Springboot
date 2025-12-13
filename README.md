@@ -10,6 +10,8 @@ A Spring Boot microservices architecture demonstrating gRPC inter-service commun
 Patient Service (REST) ──[gRPC]──> Billing Service
        ↓                    ↓
 PostgreSQL Database    Kafka (Event Streaming)
+                            ↓
+                      Analytics Service (Consumer)
 ```
 
 ## Services
@@ -49,6 +51,19 @@ gRPC microservice for billing account creation.
 - gRPC service endpoint for billing account creation
 - Protocol Buffers for type-safe service contracts
 
+### 3. Analytics Service
+Kafka consumer microservice for processing patient events and analytics.
+
+**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Kafka Consumer • Protocol Buffers
+
+**Port:** `4002`
+
+**Features:**
+- Consumes patient events from Kafka `patient` topic
+- Protocol Buffers deserialization for type-safe event processing
+- Consumer group: `analytics-service`
+- Real-time event processing and logging
+
 ## Quick Start
 
 ### Prerequisites
@@ -75,6 +90,10 @@ cd billing-service
 # Terminal 2 - Patient Service
 cd patient-service
 ./mvnw spring-boot:run
+
+# Terminal 3 - Analytics Service (Kafka Consumer)
+cd analytics-service
+./mvnw spring-boot:run
 ```
 
 ### 3. Access API Documentation
@@ -86,6 +105,7 @@ Create a patient via POST request - the service will:
 1. Save patient to PostgreSQL
 2. Call Billing Service via gRPC
 3. Publish `PatientEvent` to Kafka topic `patient`
+4. Analytics Service consumes and logs the event
 
 ## Infrastructure
 
@@ -98,8 +118,9 @@ Create a patient via POST request - the service will:
 ### Kafka Message Broker
 **Connection:** `localhost:9094` (external), `kafka:9092` (internal)
 - Mode: KRaft (no Zookeeper required)
-- Topics: Auto-created on first use
+- Topics: Auto-created on first use (`patient` topic)
 - Producer: Patient Service publishes `PatientEvent` messages
+- Consumer: Analytics Service consumes from `patient` topic
 
 ### Auto-Populated Sample Data
 
@@ -116,9 +137,10 @@ The database automatically populates with 15 sample patients on application star
 ## Build
 
 ```bash
-# Build both services
+# Build all services
 cd patient-service && ./mvnw clean install
 cd ../billing-service && ./mvnw clean install
+cd ../analytics-service && ./mvnw clean install
 ```
 
 ## What's Implemented
@@ -127,6 +149,7 @@ cd ../billing-service && ./mvnw clean install
 ✅ PostgreSQL database integration  
 ✅ gRPC client-server communication (Patient → Billing)  
 ✅ Kafka event streaming (async patient events)  
+✅ Kafka Consumer service (Analytics Service)  
 ✅ Protocol Buffers for gRPC and Kafka serialization  
 ✅ Bean validation with custom groups  
 ✅ Auto-populated sample data (15 patients)  
@@ -136,7 +159,6 @@ cd ../billing-service && ./mvnw clean install
 
 ## Planned Features
 
-🚧 Kafka Consumer service (react to patient events)  
 🚧 Service Discovery (Eureka)  
 🚧 API Gateway  
 🚧 Appointment Service  
