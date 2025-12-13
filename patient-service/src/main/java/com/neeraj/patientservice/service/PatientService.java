@@ -7,6 +7,7 @@ import com.neeraj.patientservice.entity.Patient;
 import com.neeraj.patientservice.exception.EmailAlreadyExistsException;
 import com.neeraj.patientservice.exception.PatientNotFoundException;
 import com.neeraj.patientservice.grpc.BillingServiceGrpcClient;
+import com.neeraj.patientservice.kafka.KafkaProducer;
 import com.neeraj.patientservice.mapper.PatientMapper;
 import com.neeraj.patientservice.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class PatientService {
     private final PatientRepository patientRepository;
     private final BillingServiceGrpcClient billingServiceGrpcClient;
+    private final KafkaProducer kafkaProducer;
 
     public List<PatientResponseDTO> getAllPatients() {
         log.info("Fetching all patients from the database");
@@ -56,6 +58,10 @@ public class PatientService {
                 createdPatient.getEmail()
         );
         log.info("Received BillingResponse for new patient: {}", billingResponse);
+
+        // Send event to Kafka
+        kafkaProducer.sendEvent(createdPatient);
+        log.info("Sent event to Kafka for new patient: {}", createdPatient);
 
         return PatientMapper.toDTO(createdPatient);
     }

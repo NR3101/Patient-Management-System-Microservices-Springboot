@@ -1,17 +1,183 @@
-services:
-  postgres:
-    image: postgres:latest
-    container_name: patient-service-db
-    restart: always
-    environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: patient_service
-    ports:
-      - "5432:5432"
-    volumes:
-      - db-data:/var/lib/postgresql
-      - db-data:/var/log/postgresql
+# docker-compose.yml - Defines multiple Docker containers that work together
+# This file orchestrates PostgreSQL database + Kafka message broker for our microservices
 
+# ============================================================================
+# SERVICES SECTION - Define all containers that will run
+# ============================================================================
+services:
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database Container
+  # --------------------------------------------------------------------------
+  postgres:
+    # The Docker image to use (latest version)
+    image: postgres:latest
+
+    # Custom name for this container (easier to identify in Docker Desktop)
+    container_name: patient-service-db
+
+    # Auto-restart the container if it crashes or Docker restarts
+    restart: always
+
+    # Environment variables - configuration passed to the PostgreSQL container
+    environment:
+      # Database superuser username
+      POSTGRES_USER: root
+      # Database superuser password (CHANGE THIS in production!)
+      POSTGRES_PASSWORD: password
+      # Default database that gets created on first startup
+      POSTGRES_DB: patient_service
+
+    # Port mapping: host_port:container_port
+    # Allows your Spring Boot app (running on host) to connect to PostgreSQL
+    ports:
+      - "5432:5432"  # Standard PostgreSQL port
+
+    # Volumes - persistent storage (data survives container restarts)
+    volumes:
+      # Maps named volume 'db-data' to PostgreSQL's data directory
+      # Without this, all data would be lost when container stops!
+      - db-data:/var/lib/postgresql
+
+  # --------------------------------------------------------------------------
+  # Apache Kafka Container (KRaft Mode - No Zookeeper Needed!)
+  # --------------------------------------------------------------------------
+  kafka:
+    # Custom name for this container
+    container_name: kafka
+
+    # Latest Apache Kafka image (v3.x+ supports KRaft mode)
+    image: apache/kafka:latest
+
+    # Port mappings - Kafka needs multiple ports for different purposes
+    ports:
+      # PLAINTEXT listener - for communication between Docker containers
+      - "9092:9092"
+      # EXTERNAL listener - for your host machine (Spring Boot app) to connect
+      - "9094:9094"
+
+    # Environment variables configure Kafka's behavior
+    environment:
+      ############################################
+      # SECTION 1: KRaft Metadata & Node Identity
+      ############################################
+
+      # Unique ID for this Kafka node (in a cluster, each node needs unique ID)
+      # Since we have only 1 node, we use ID = 1
+      KAFKA_NODE_ID: 1
+
+      # Unique identifier for the entire Kafka cluster
+      # Required in KRaft mode (replaces Zookeeper's cluster coordination)
+      KAFKA_CLUSTER_ID: 'patient-management-cluster-1'
+
+      # What roles this node performs:
+      # - 'broker': handles client requests (produce/consume messages)
+      # - 'controller': manages cluster metadata (like Zookeeper did before)
+      # In single-node setup, one node does both jobs
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+
+      ############################################
+      # SECTION 2: Controller Quorum (Raft Consensus)
+      ############################################
+
+      # List of controller nodes that vote on cluster decisions
+      # Format: node_id@hostname:port
+      # '1@kafka:9093' means: Node 1 is at hostname 'kafka' on port 9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+
+      # Name of the listener controllers use to talk to each other
+      # Must match one of the listener names defined below
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+
+      ############################################
+      # SECTION 3: Network Listeners Configuration
+      ############################################
+
+      # Define ALL network interfaces Kafka will listen on
+      # Format: LISTENER_NAME://host:port
+      KAFKA_LISTENERS: >
+        PLAINTEXT://0.0.0.0:9092,
+        EXTERNAL://0.0.0.0:9094,
+        CONTROLLER://0.0.0.0:9093
+
+      # Explanation of each listener:
+      # - PLAINTEXT: For other Docker containers to connect (internal)
+      # - EXTERNAL: For host machine (your Spring Boot app) to connect
+      # - CONTROLLER: For Raft consensus between controllers (internal)
+      # - 0.0.0.0 means "listen on all network interfaces"
+
+      # What address Kafka tells clients to use when connecting
+      # This is what clients see in the connection string
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka:9092,
+        EXTERNAL://localhost:9094
+
+      # Explanation:
+      # - Docker containers should connect to 'kafka:9092' (Docker network)
+      # - Host machine should connect to 'localhost:9094' (external access)
+
+      # Maps listener names to security protocols
+      # PLAINTEXT = no encryption (OK for local development)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT,
+        EXTERNAL:PLAINTEXT
+
+      # Which listener brokers use to talk to each other
+      # They use 'PLAINTEXT' (the internal Docker network listener)
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+
+      ############################################
+      # SECTION 4: Single-Node Cluster Settings
+      ############################################
+
+      # Replication factor for internal '__consumer_offsets' topic
+      # Tracks where each consumer is in reading messages
+      # Set to 1 because we only have 1 broker (can't replicate to others!)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Replication factor for transaction logs
+      # Used for exactly-once message delivery guarantees
+      # Set to 1 because single-node cluster
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      # Minimum in-sync replicas for transaction logs
+      # Set to 1 because we only have 1 broker
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      ############################################
+      # SECTION 5: Developer-Friendly Settings
+      ############################################
+
+      # How long to wait before first consumer rebalance (in milliseconds)
+      # 0 = no delay, speeds up development/testing
+      # In production, you might set this to 3000ms (3 seconds)
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # Auto-create topics when producer/consumer first uses them
+      # 'true' = convenient for development (no manual topic creation)
+      # 'false' = better for production (explicit topic management)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+      # Default number of partitions for auto-created topics
+      # Partitions allow parallel processing of messages
+      # 1 partition = all messages in order, but can't scale horizontally
+      KAFKA_NUM_PARTITIONS: 1
+
+    # Persistent storage for Kafka data (messages, logs, metadata)
+    volumes:
+      # Maps named volume 'kafka-data' to Kafka's data directory
+      # Without this, all messages would be lost on container restart!
+      - kafka-data:/var/lib/kafka/data
+
+
+# ============================================================================
+# VOLUMES SECTION - Define named volumes for persistent data
+# ============================================================================
+# These are managed by Docker and survive container restarts
 volumes:
+  # PostgreSQL data volume - stores all database tables and data
   db-data:
+
+  # Kafka data volume - stores all messages, topics, and metadata
+  kafka-data:

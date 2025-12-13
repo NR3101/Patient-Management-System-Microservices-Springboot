@@ -8,22 +8,23 @@ A Spring Boot microservices architecture demonstrating gRPC inter-service commun
 
 ```
 Patient Service (REST) ──[gRPC]──> Billing Service
-       ↓
-PostgreSQL Database
+       ↓                    ↓
+PostgreSQL Database    Kafka (Event Streaming)
 ```
 
 ## Services
 
 ### 1. Patient Service
-REST API for patient record management with automated billing account creation via gRPC.
+REST API for patient record management with automated billing account creation via gRPC and event streaming.
 
-**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Spring Data JPA • PostgreSQL • gRPC Client • OpenAPI
+**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Spring Data JPA • PostgreSQL • gRPC Client • Kafka Producer • OpenAPI
 
 **Port:** `4000`
 
 **Features:**
 - Full CRUD operations for patient records
 - Automatic billing account creation via gRPC on patient creation
+- Event publishing to Kafka on patient creation (using Protocol Buffers)
 - Bean validation with custom validation groups
 - Auto-populated sample data (15 patients)
 - OpenAPI/Swagger documentation
@@ -55,9 +56,14 @@ gRPC microservice for billing account creation.
 - Docker & Docker Compose
 - Maven 3.9+
 
-### 1. Start Database
+### 1. Start Infrastructure (Database + Kafka)
 ```bash
+# Start PostgreSQL and Kafka in KRaft mode
 docker-compose up -d
+
+# Wait ~30 seconds for services to be ready
+# Verify both containers are running
+docker-compose ps
 ```
 
 ### 2. Start Services
@@ -75,12 +81,25 @@ cd patient-service
 - Swagger UI: http://localhost:4000/swagger-ui.html
 - OpenAPI Spec: http://localhost:4000/v3/api-docs
 
-## Database
+### 4. Test Kafka Integration
+Create a patient via POST request - the service will:
+1. Save patient to PostgreSQL
+2. Call Billing Service via gRPC
+3. Publish `PatientEvent` to Kafka topic `patient`
 
-**PostgreSQL:** `localhost:5432`
+## Infrastructure
+
+### PostgreSQL Database
+**Connection:** `localhost:5432`
 - Database: `patient_service`
 - User: `root`
 - Password: `password`
+
+### Kafka Message Broker
+**Connection:** `localhost:9094` (external), `kafka:9092` (internal)
+- Mode: KRaft (no Zookeeper required)
+- Topics: Auto-created on first use
+- Producer: Patient Service publishes `PatientEvent` messages
 
 ### Auto-Populated Sample Data
 
@@ -106,16 +125,18 @@ cd ../billing-service && ./mvnw clean install
 
 ✅ Patient Service REST API with full CRUD  
 ✅ PostgreSQL database integration  
-✅ gRPC client-server communication  
-✅ Protocol Buffers for service contracts  
+✅ gRPC client-server communication (Patient → Billing)  
+✅ Kafka event streaming (async patient events)  
+✅ Protocol Buffers for gRPC and Kafka serialization  
 ✅ Bean validation with custom groups  
-✅ Auto-populated sample data  
+✅ Auto-populated sample data (15 patients)  
 ✅ OpenAPI/Swagger documentation  
-✅ Docker Compose for PostgreSQL  
+✅ Docker Compose with PostgreSQL + Kafka (KRaft mode)  
 ✅ Exception handling and custom exceptions  
 
 ## Planned Features
 
+🚧 Kafka Consumer service (react to patient events)  
 🚧 Service Discovery (Eureka)  
 🚧 API Gateway  
 🚧 Appointment Service  

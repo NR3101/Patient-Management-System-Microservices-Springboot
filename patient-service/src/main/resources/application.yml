@@ -20,6 +20,11 @@ spring:
   sql:
     init:
       mode: always
+  kafka:
+    bootstrap-servers: localhost:9094
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 #  h2:
 #    console:
 #      enabled: true
