@@ -7,14 +7,14 @@
 services:
 
   # --------------------------------------------------------------------------
-  # PostgreSQL Database Container
+  # PostgreSQL Database Container - Patient Service
   # --------------------------------------------------------------------------
-  postgres:
+  postgres-patient:
     # The Docker image to use (latest version)
     image: postgres:latest
 
     # Custom name for this container (easier to identify in Docker Desktop)
-    container_name: patient-service-db
+    container_name: postgres-patient
 
     # Auto-restart the container if it crashes or Docker restarts
     restart: always
@@ -35,9 +35,43 @@ services:
 
     # Volumes - persistent storage (data survives container restarts)
     volumes:
-      # Maps named volume 'db-data' to PostgreSQL's data directory
+      # Maps named volume 'patient-db-data' to PostgreSQL's data directory
       # Without this, all data would be lost when container stops!
-      - db-data:/var/lib/postgresql
+      - patient-db-data:/var/lib/postgresql
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database Container - Auth Service
+  # --------------------------------------------------------------------------
+  postgres-auth:
+    # The Docker image to use (latest version)
+    image: postgres:latest
+
+    # Custom name for this container (easier to identify in Docker Desktop)
+    container_name: postgres-auth
+
+    # Auto-restart the container if it crashes or Docker restarts
+    restart: always
+
+    # Environment variables - configuration passed to the PostgreSQL container
+    environment:
+      # Database superuser username
+      POSTGRES_USER: root
+      # Database superuser password (CHANGE THIS in production!)
+      POSTGRES_PASSWORD: password
+      # Default database that gets created on first startup
+      POSTGRES_DB: auth_service
+
+    # Port mapping: host_port:container_port
+    # Allows your Spring Boot app (running on host) to connect to PostgreSQL
+    # Using port 5433 on host to avoid conflict with patient-service DB
+    ports:
+      - "5433:5432"  # Map host port 5433 to container port 5432
+
+    # Volumes - persistent storage (data survives container restarts)
+    volumes:
+      # Maps named volume 'auth-db-data' to PostgreSQL's data directory
+      # Without this, all data would be lost when container stops!
+      - auth-db-data:/var/lib/postgresql
 
   # --------------------------------------------------------------------------
   # Apache Kafka Container (KRaft Mode - No Zookeeper Needed!)
@@ -176,8 +210,11 @@ services:
 # ============================================================================
 # These are managed by Docker and survive container restarts
 volumes:
-  # PostgreSQL data volume - stores all database tables and data
-  db-data:
+  # PostgreSQL data volume for Patient Service - stores all database tables and data
+  patient-db-data:
+
+  # PostgreSQL data volume for Auth Service - stores all database tables and data
+  auth-db-data:
 
   # Kafka data volume - stores all messages, topics, and metadata
   kafka-data:
