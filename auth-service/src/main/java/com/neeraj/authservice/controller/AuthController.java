@@ -4,6 +4,7 @@ import com.neeraj.authservice.dto.LoginRequestDTO;
 import com.neeraj.authservice.dto.LoginResponseDTO;
 import com.neeraj.authservice.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Tag(name = "Auth Service", description = "API for authentication")
 public class AuthController {
 
     private final AuthService authService;

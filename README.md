@@ -98,26 +98,28 @@ Kafka consumer microservice for processing patient events and analytics.
 - Real-time event processing and logging
 
 ### 5. API Gateway
-Spring Cloud Gateway for routing and centralizing API access.
+Spring Cloud Gateway for routing, JWT validation, and centralizing API access with cleaner URL paths.
 
-**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Spring Cloud Gateway (WebFlux)
+**Tech Stack:** Java 21 • Spring Boot 3.5.8 • Spring Cloud Gateway (WebFlux) • WebClient
 
 **Port:** `4004`
 
 **Features:**
 - Centralized entry point for all microservices
-- Route configuration for Patient Service
-- Path-based routing (`/api/v1/patients/**`)
+- **JWT validation filter** for protected routes (auto-validates with Auth Service)
+- Cleaner public URLs (removes `/api/v1` prefix at gateway level)
+- Path rewriting with `PrefixPath` filter for backend services
+- Custom exception handling for unauthorized requests
 - API documentation aggregation
 - Reactive gateway using Spring WebFlux
 
 **Routes:**
-| Path | Target Service | Port |
-|------|---------------|------|
-| `/api/v1/auth/**` | Auth Service | 4003 |
-| `/api/v1/patients/**` | Patient Service | 4000 |
-| `/api-docs/auth` | Auth API Docs | 4003 |
-| `/api-docs/patients` | Patient API Docs | 4000 |
+| Gateway Path | Target Service | Backend Path | JWT Protected |
+|--------------|----------------|--------------|---------------|
+| `/auth/**` | Auth Service | `/api/v1/auth/**` | ❌ |
+| `/patients/**` | Patient Service | `/api/v1/patients/**` | ✅ |
+| `/api-docs/auth` | Auth API Docs | `/v3/api-docs` | ❌ |
+| `/api-docs/patients` | Patient API Docs | `/v3/api-docs` | ❌ |
 
 ## Quick Start
 
@@ -161,8 +163,8 @@ cd api-gateway
 
 ### 3. Access API
 **Via API Gateway (Recommended):**
-- Auth Service: http://localhost:4004/api/v1/auth
-- Patient Service: http://localhost:4004/api/v1/patients
+- Auth Service: http://localhost:4004/auth
+- Patient Service: http://localhost:4004/patients (requires JWT token)
 - Auth API Docs: http://localhost:4004/api-docs/auth
 - Patient API Docs: http://localhost:4004/api-docs/patients
 
@@ -176,7 +178,7 @@ cd api-gateway
 
 **Step 1: Authenticate and get JWT token**
 ```bash
-curl -X POST http://localhost:4004/api/v1/auth/login \
+curl -X POST http://localhost:4004/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "testuser@test.com",
@@ -185,16 +187,11 @@ curl -X POST http://localhost:4004/api/v1/auth/login \
 ```
 Response: `{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6..."}`
 
-**Step 2: Validate token (optional)**
+**Step 2: Create a patient via API Gateway (JWT validated automatically)**
 ```bash
-curl -X GET http://localhost:4004/api/v1/auth/validate \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-**Step 3: Create a patient via API Gateway**
-```bash
-curl -X POST http://localhost:4004/api/v1/patients \
+curl -X POST http://localhost:4004/patients \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "name": "John Doe",
     "email": "john@example.com",
@@ -203,8 +200,14 @@ curl -X POST http://localhost:4004/api/v1/patients \
   }'
 ```
 
+**Step 3: Get all patients (JWT required)**
+```bash
+curl -X GET http://localhost:4004/patients \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
 **Event Flow:**
-1. Auth Service validates JWT token
+1. API Gateway validates JWT token with Auth Service
 2. API Gateway routes request to Patient Service
 3. Patient saved to PostgreSQL (Patient DB)
 4. Patient Service calls Billing Service via gRPC
@@ -265,7 +268,9 @@ cd ../api-gateway && ./mvnw clean install
 ✅ **Database**: Separate PostgreSQL databases for Auth and Patient services  
 ✅ **gRPC Communication**: Patient → Billing service inter-service calls  
 ✅ **Event Streaming**: Kafka producer (Patient) and consumer (Analytics)  
-✅ **API Gateway**: Spring Cloud Gateway with centralized routing  
+✅ **API Gateway**: Spring Cloud Gateway with centralized routing and cleaner URLs  
+✅ **JWT Validation Filter**: Automatic token validation at gateway level for protected routes  
+✅ **Path Rewriting**: `PrefixPath` filter to expose clean URLs (`/patients` → `/api/v1/patients`)  
 ✅ **Protocol Buffers**: Type-safe serialization for gRPC and Kafka  
 ✅ **Security**: BCrypt password hashing and stateless JWT authentication  
 ✅ **Validation**: Bean validation with custom validation groups  
@@ -276,7 +281,6 @@ cd ../api-gateway && ./mvnw clean install
 
 ## Planned Features
 
-🚧 JWT validation in API Gateway (route-level security)  
 🚧 Service Discovery (Eureka)  
 🚧 Load Balancing in API Gateway  
 🚧 Appointment Service  

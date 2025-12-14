@@ -19,7 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/patients")
 @RequiredArgsConstructor
-@Tag(name = "Patient", description = "API for managing patients")
+@Tag(name = "Patient Service", description = "API for managing patients")
 public class PatientController {
     private final PatientService patientService;
 

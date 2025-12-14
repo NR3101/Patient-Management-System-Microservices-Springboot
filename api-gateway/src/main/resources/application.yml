@@ -6,16 +6,37 @@ spring:
       server:
         webflux:
           routes:
+            - id: auth-service
+              uri: http://localhost:4003
+              predicates:
+                - Path=/auth/**
+              filters:
+                - PrefixPath=/api/v1 # Add "/api/v1" prefix
+
             - id: patient-service
               uri: http://localhost:4000
               predicates:
-                - Path=/api/v1/patients/**
+                - Path=/patients/**
+              filters:
+                - PrefixPath=/api/v1 # Add "/api/v1" prefix
+                - JwtValidation # Apply JWT validation filter
+
             - id: patient-service-docs
               uri: http://localhost:4000
               predicates:
                 - Path=/api-docs/patients
               filters:
                 - RewritePath=/api-docs/patients, /v3/api-docs
+
+            - id: auth-service-docs
+              uri: http://localhost:4003
+              predicates:
+                - Path=/api-docs/auth
+              filters:
+                - RewritePath=/api-docs/auth, /v3/api-docs
+
+auth-service:
+  url: http://localhost:4003
 
 server:
   port: 4004
