@@ -121,6 +121,18 @@ Spring Cloud Gateway for routing, JWT validation, and centralizing API access wi
 | `/api-docs/auth` | Auth API Docs | `/v3/api-docs` | ❌ |
 | `/api-docs/patients` | Patient API Docs | `/v3/api-docs` | ❌ |
 
+### 6. Integration Tests
+End-to-end integration test suite for API Gateway routes and service interactions.
+
+**Tech Stack:** Java 21 • REST Assured 5.3.0 • JUnit Jupiter 5.11.4
+
+**Features:**
+- REST API testing through API Gateway
+- Authentication flow validation
+- JWT token generation and usage tests
+- Patient service endpoint testing with authorization
+- Validates complete service integration via gateway
+
 ## Quick Start
 
 ### Prerequisites
@@ -259,6 +271,9 @@ cd ../patient-service && ./mvnw clean install
 cd ../billing-service && ./mvnw clean install
 cd ../analytics-service && ./mvnw clean install
 cd ../api-gateway && ./mvnw clean install
+
+# Run integration tests (ensure all services are running first)
+cd ../integration-tests && mvn clean test
 ```
 
 ## What's Implemented
@@ -278,6 +293,7 @@ cd ../api-gateway && ./mvnw clean install
 ✅ **Documentation**: OpenAPI/Swagger for all REST services  
 ✅ **Infrastructure**: Docker Compose with PostgreSQL + Kafka (KRaft mode)  
 ✅ **Error Handling**: Custom exceptions and global exception handlers  
+✅ **Integration Tests**: End-to-end API testing with REST Assured  
 
 ## Planned Features
 
